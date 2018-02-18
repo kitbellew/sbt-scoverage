@@ -8,6 +8,11 @@ class GoodCoverageSpec extends Specification {
   "GoodCoverage" should {
     "sum two numbers" in {
       GoodCoverage.sum(1, 2) mustEqual 3
+      GoodCoverage.sum(0, 3) mustEqual 3
+      GoodCoverage.sum(3, 0) mustEqual 3
+      two.GoodCoverage.sum(1, 2) mustEqual 3
+      two.GoodCoverage.sum(0, 3) mustEqual 3
+      two.GoodCoverage.sum(3, 0) mustEqual 3
     }
   }
 }

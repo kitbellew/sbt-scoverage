@@ -28,6 +28,11 @@ object ScoverageSbtPlugin extends AutoPlugin {
     coverageExcludedPackages := "",
     coverageExcludedFiles := "",
     coverageMinimum := 0, // default is no minimum
+    coverageMinimumBranchTotal := 0,
+    coverageMinimumStmtPerPackage := 0,
+    coverageMinimumBranchPerPackage := 0,
+    coverageMinimumStmtPerFile := 0,
+    coverageMinimumBranchPerFile := 0,
     coverageFailOnMinimum := false,
     coverageHighlighting := true,
     coverageOutputXML := true,
@@ -122,7 +127,7 @@ object ScoverageSbtPlugin extends AutoPlugin {
           sourceEncoding((Compile / scalacOptions).value),
           log)
 
-        checkCoverage(cov, log, coverageMinimum.value, coverageFailOnMinimum.value)
+        checkCoverage(cov, log, coverageMinima.value, coverageFailOnMinimum.value)
       case None => log.warn("No coverage data, skipping reports")
     }
   }
@@ -148,7 +153,7 @@ object ScoverageSbtPlugin extends AutoPlugin {
         val cfmt = cov.statementCoverageFormatted
         log.info(s"Aggregation complete. Coverage was [$cfmt]")
 
-        checkCoverage(cov, log, coverageMinimum.value, coverageFailOnMinimum.value)
+        checkCoverage(cov, log, coverageMinima.value, coverageFailOnMinimum.value)
       case None =>
         log.info("No subproject data to aggregate, skipping reports")
     }
@@ -242,28 +247,51 @@ object ScoverageSbtPlugin extends AutoPlugin {
 
   private def checkCoverage(coverage: Coverage,
                             log: Logger,
-                            min: Double,
+                            min: CoverageMinima,
                             failOnMin: Boolean): Unit = {
+    val ok: Boolean = checkCoverage(coverage, "Total", log, min.total) &&
+      coverage.packages.forall(x => checkCoverage(x, s"Package:${x.name}", log, min.perPackage)) &&
+      coverage.files.forall(x => checkCoverage(x, s"File:${x.filename}", log, min.perFile))
 
-    val cper = coverage.statementCoveragePercent
-    val cfmt = coverage.statementCoverageFormatted
+    if (!ok && failOnMin)
+      throw new RuntimeException("Coverage minimum was not reached")
 
+    log.info(s"All done. Coverage was [${coverage.statementCoverageFormatted}%]")
+  }
+
+  private def checkCoverage(metrics: CoverageMetrics,
+                            metric: String,
+                            log: Logger,
+                            min: CoverageMinimum): Boolean = {
+    checkCoverage(s"Branch:$metric", log, min.branch, metrics.branchCoveragePercent) &&
+      checkCoverage(s"Stmt:$metric", log, min.statement, metrics.statementCoveragePercent)
+  }
+
+  private def checkCoverage(metric: String,
+                            log: Logger,
+                            min: Double,
+                            cper: Double): Boolean = {
     // check for default minimum
-    if (min > 0) {
+    if (min <= 0) {
+      true
+    } else {
       def is100(d: Double) = Math.abs(100 - d) <= 0.00001
 
       if (is100(min) && is100(cper)) {
-        log.info(s"100% Coverage !")
-      } else if (min > cper) {
-        log.error(s"Coverage is below minimum [$cfmt% < $min%]")
-        if (failOnMin)
-          throw new RuntimeException("Coverage minimum was not reached")
+        log.debug(s"100% Coverage: $metric")
+        true
       } else {
-        log.info(s"Coverage is above minimum [$cfmt% > $min%]")
+        val ok: Boolean = min <= cper
+        val minfmt = scoverage.DoubleFormat.twoFractionDigits(min)
+        val cfmt = scoverage.DoubleFormat.twoFractionDigits(cper)
+        if (ok) {
+          log.debug(s"Coverage is above minimum [$cfmt% > $minfmt%]: $metric")
+        } else {
+          log.error(s"Coverage is below minimum [$cfmt% < $minfmt%]: $metric")
+        }
+        ok
       }
     }
-
-    log.info(s"All done. Coverage was [$cfmt%]")
   }
 
   private def sourceEncoding(scalacOptions: Seq[String]): Option[String] = {

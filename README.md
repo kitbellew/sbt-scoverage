@@ -108,8 +108,13 @@ Any code between two such comments will not be instrumented or included in the c
 Based on minimum coverage, you can fail the build with the following keys
 
 ```scala
-coverageMinimum := 80
+coverageMinimum := 95
 coverageFailOnMinimum := true
+coverageMinimumBranchTotal := 90
+coverageMinimumStmtPerPackage := 90
+coverageMinimumBranchPerPackage := 85
+coverageMinimumStmtPerFile := 85
+coverageMinimumBranchPerFile := 80
 ```
 
 These settings will be enforced when the reports are generated.
